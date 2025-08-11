@@ -34,7 +34,7 @@ RUN pip install torch==2.0.0 torchaudio==2.0.0 --index-url https://download.pyto
 RUN rm -rf .git
 
 # Upgrade pip and install basic dependencies
-RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+# RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
 
 # Install dependencies
 COPY requirements.txt .
