@@ -7,7 +7,7 @@ ARG PYTHON_VERSION=3.10
 
 # Change software sources and install basic tools and system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    software-properties-common git curl sudo nano iftop htop ffmpeg fonts-noto wget \
+    software-properties-common git curl sudo nano iftop htop ffmpeg fonts-noto wget fonts-noto-cjk \
     && add-apt-repository ppa:deadsnakes/ppa \
     && apt-get update -y \
     && apt-get install -y python${PYTHON_VERSION} python${PYTHON_VERSION}-dev python${PYTHON_VERSION}-venv \
