@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VideoLingo API 测试界面</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        .tabs {
+            display: flex;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .tab {
+            padding: 15px 30px;
+            cursor: pointer;
+            background: none;
+            border: none;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            border-bottom: 3px solid transparent;
+        }
+
+        .tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+            font-weight: bold;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e1e1e1;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: auto;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: transform 0.3s ease;
+            width: 100%;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .progress-container {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e1e1e1;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 15px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .status-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .status-item {
+            background: white;
+            padding: 15px;
+            border-radius: 6px;
+            border-left: 4px solid #667eea;
+        }
+
+        .status-item strong {
+            color: #333;
+        }
+
+        .results {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .download-links {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .download-btn {
+            background: #28a745;
+            color: white;
+            padding: 12px 20px;
+            text-decoration: none;
+            border-radius: 6px;
+            text-align: center;
+            transition: background 0.3s ease;
+        }
+
+        .download-btn:hover {
+            background: #218838;
+        }
+
+        .tasks-list {
+            margin-top: 30px;
+        }
+
+        .task-item {
+            background: #f8f9fa;
+            border: 1px solid #e1e1e1;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 15px;
+        }
+
+        .task-header {
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .task-id {
+            font-family: 'Courier New', monospace;
+            background: #e9ecef;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .status-pending { background: #ffc107; color: #212529; }
+        .status-processing { background: #007bff; color: white; }
+        .status-completed { background: #28a745; color: white; }
+        .status-failed { background: #dc3545; color: white; }
+
+        @media (max-width: 768px) {
+            .content {
+                padding: 20px;
+            }
+            
+            .status-info {
+                grid-template-columns: 1fr;
+            }
+            
+            .download-links {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎬 VideoLingo API</h1>
+            <p>智能视频翻译和配音服务</p>
+        </div>
+        
+        <div class="content">
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab('url')">YouTube URL</button>
+                <button class="tab" onclick="switchTab('upload')">文件上传</button>
+                <button class="tab" onclick="switchTab('tasks')">任务管理</button>
+            </div>
+
+            <!-- URL 处理标签页 -->
+            <div id="url-tab" class="tab-content active">
+                <form id="url-form">
+                    <div class="form-group">
+                        <label for="video-url">YouTube 视频链接</label>
+                        <input type="url" id="video-url" placeholder="https://www.youtube.com/watch?v=..." required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="target-lang-url">目标语言</label>
+                        <select id="target-lang-url">
+                            <option value="简体中文">简体中文</option>
+                            <option value="繁體中文">繁體中文</option>
+                            <option value="English">English</option>
+                            <option value="日本語">日本語</option>
+                            <option value="한국어">한국어</option>
+                            <option value="Français">Français</option>
+                            <option value="Deutsch">Deutsch</option>
+                            <option value="Español">Español</option>
+                            <option value="Русский">Русский</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="source-lang-url">源语言 (可选)</label>
+                        <select id="source-lang-url">
+                            <option value="">自动检测</option>
+                            <option value="en">English</option>
+                            <option value="zh">中文</option>
+                            <option value="ja">日本語</option>
+                            <option value="ko">한국어</option>
+                            <option value="fr">Français</option>
+                            <option value="de">Deutsch</option>
+                            <option value="es">Español</option>
+                            <option value="ru">Русский</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="resolution-url">下载分辨率</label>
+                        <select id="resolution-url">
+                            <option value="1080">1080p</option>
+                            <option value="720">720p</option>
+                            <option value="360">360p</option>
+                            <option value="best">最佳质量</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="enable-dubbing-url">
+                            <label for="enable-dubbing-url">启用配音</label>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="burn-subtitles-url" checked>
+                            <label for="burn-subtitles-url">烧录字幕到视频</label>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn">开始处理</button>
+                </form>
+            </div>
+
+            <!-- 文件上传标签页 -->
+            <div id="upload-tab" class="tab-content">
+                <form id="upload-form">
+                    <div class="form-group">
+                        <label for="video-file">选择视频文件</label>
+                        <input type="file" id="video-file" accept=".mp4,.mov,.avi,.mkv,.flv,.wmv,.webm" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="target-lang-upload">目标语言</label>
+                        <select id="target-lang-upload">
+                            <option value="简体中文">简体中文</option>
+                            <option value="繁體中文">繁體中文</option>
+                            <option value="English">English</option>
+                            <option value="日本語">日本語</option>
+                            <option value="한국어">한국어</option>
+                            <option value="Français">Français</option>
+                            <option value="Deutsch">Deutsch</option>
+                            <option value="Español">Español</option>
+                            <option value="Русский">Русский</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="source-lang-upload">源语言 (可选)</label>
+                        <select id="source-lang-upload">
+                            <option value="">自动检测</option>
+                            <option value="en">English</option>
+                            <option value="zh">中文</option>
+                            <option value="ja">日本語</option>
+                            <option value="ko">한국어</option>
+                            <option value="fr">Français</option>
+                            <option value="de">Deutsch</option>
+                            <option value="es">Español</option>
+                            <option value="ru">Русский</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="enable-dubbing-upload">
+                            <label for="enable-dubbing-upload">启用配音</label>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="burn-subtitles-upload" checked>
+                            <label for="burn-subtitles-upload">烧录字幕到视频</label>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn">上传并处理</button>
+                </form>
+            </div>
+
+            <!-- 任务管理标签页 -->
+            <div id="tasks-tab" class="tab-content">
+                <div style="display: flex; justify-content: between; margin-bottom: 20px;">
+                    <button class="btn" onclick="refreshTasks()" style="width: auto; margin-right: 10px;">刷新任务列表</button>
+                    <select id="status-filter" onchange="refreshTasks()" style="width: auto;">
+                        <option value="">所有状态</option>
+                        <option value="pending">等待中</option>
+                        <option value="processing">处理中</option>
+                        <option value="completed">已完成</option>
+                        <option value="failed">失败</option>
+                    </select>
+                </div>
+                <div id="tasks-list" class="tasks-list"></div>
+            </div>
+
+            <!-- 进度显示 -->
+            <div id="progress-container" class="progress-container">
+                <h3>处理进度</h3>
+                <div class="progress-bar">
+                    <div id="progress-fill" class="progress-fill"></div>
+                </div>
+                <div class="status-info">
+                    <div class="status-item">
+                        <strong>任务ID:</strong> <span id="task-id">-</span>
+                    </div>
+                    <div class="status-item">
+                        <strong>当前步骤:</strong> <span id="current-step">-</span>
+                    </div>
+                    <div class="status-item">
+                        <strong>状态:</strong> <span id="task-status">-</span>
+                    </div>
+                    <div class="status-item">
+                        <strong>进度:</strong> <span id="task-progress">0%</span>
+                    </div>
+                </div>
+                <div class="status-item" style="margin-top: 15px;">
+                    <strong>消息:</strong> <span id="task-message">-</span>
+                </div>
+            </div>
+
+            <!-- 结果显示 -->
+            <div id="results" class="results">
+                <h3>处理结果</h3>
+                <p>您的视频已成功处理完成！点击下方链接下载结果文件：</p>
+                <div id="download-links" class="download-links"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '';
+        let currentTaskId = null;
+        let statusInterval = null;
+
+        // 标签页切换
+        function switchTab(tabName) {
+            // 隐藏所有标签内容
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            // 移除所有标签的活动状态
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // 显示选中的标签内容
+            document.getElementById(tabName + '-tab').classList.add('active');
+            
+            // 激活选中的标签
+            event.target.classList.add('active');
+        }
+
+        // URL 处理表单提交
+        document.getElementById('url-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = {
+                url: document.getElementById('video-url').value,
+                target_language: document.getElementById('target-lang-url').value,
+                source_language: document.getElementById('source-lang-url').value || null,
+                enable_dubbing: document.getElementById('enable-dubbing-url').checked,
+                burn_subtitles: document.getElementById('burn-subtitles-url').checked,
+                resolution: document.getElementById('resolution-url').value
+            };
+
+            try {
+                showProgress();
+                const response = await fetch(`${API_BASE}/api/v1/process-url`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(formData)
+                });
+
+                const result = await response.json();
+                if (response.ok) {
+                    currentTaskId = result.task_id;
+                    startStatusPolling();
+                } else {
+                    alert('错误: ' + result.detail);
+                    hideProgress();
+                }
+            } catch (error) {
+                alert('请求失败: ' + error.message);
+                hideProgress();
+            }
+        });
+
+        // 文件上传表单提交
+        document.getElementById('upload-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = new FormData();
+            formData.append('file', document.getElementById('video-file').files[0]);
+            formData.append('target_language', document.getElementById('target-lang-upload').value);
+            formData.append('source_language', document.getElementById('source-lang-upload').value);
+            formData.append('enable_dubbing', document.getElementById('enable-dubbing-upload').checked);
+            formData.append('burn_subtitles', document.getElementById('burn-subtitles-upload').checked);
+
+            try {
+                showProgress();
+                const response = await fetch(`${API_BASE}/api/v1/upload`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                if (response.ok) {
+                    currentTaskId = result.task_id;
+                    startStatusPolling();
+                } else {
+                    alert('错误: ' + result.detail);
+                    hideProgress();
+                }
+            } catch (error) {
+                alert('请求失败: ' + error.message);
+                hideProgress();
+            }
+        });
+
+        // 显示进度
+        function showProgress() {
+            document.getElementById('progress-container').style.display = 'block';
+            document.getElementById('results').style.display = 'none';
+        }
+
+        // 隐藏进度
+        function hideProgress() {
+            document.getElementById('progress-container').style.display = 'none';
+            if (statusInterval) {
+                clearInterval(statusInterval);
+                statusInterval = null;
+            }
+        }
+
+        // 开始状态轮询
+        function startStatusPolling() {
+            if (statusInterval) {
+                clearInterval(statusInterval);
+            }
+            
+            statusInterval = setInterval(async () => {
+                if (!currentTaskId) return;
+                
+                try {
+                    const response = await fetch(`${API_BASE}/api/v1/tasks/${currentTaskId}`);
+                    const task = await response.json();
+                    
+                    updateTaskStatus(task);
+                    
+                    if (task.status === 'completed' || task.status === 'failed') {
+                        clearInterval(statusInterval);
+                        statusInterval = null;
+                        
+                        if (task.status === 'completed') {
+                            showResults(task);
+                        }
+                    }
+                } catch (error) {
+                    console.error('状态轮询失败:', error);
+                }
+            }, 2000);
+        }
+
+        // 更新任务状态显示
+        function updateTaskStatus(task) {
+            document.getElementById('task-id').textContent = task.task_id;
+            document.getElementById('current-step').textContent = task.current_step;
+            document.getElementById('task-status').textContent = task.status;
+            document.getElementById('task-progress').textContent = task.progress + '%';
+            document.getElementById('task-message').textContent = task.message;
+            document.getElementById('progress-fill').style.width = task.progress + '%';
+        }
+
+        // 显示结果
+        function showResults(task) {
+            if (!task.result) return;
+            
+            document.getElementById('results').style.display = 'block';
+            const downloadLinks = document.getElementById('download-links');
+            downloadLinks.innerHTML = '';
+            
+            const fileTypes = {
+                'video_with_subtitles': '带字幕视频',
+                'video_with_dubbing': '带配音视频',
+                'source_subtitles': '原文字幕',
+                'translated_subtitles': '翻译字幕',
+                'dubbing_audio': '配音音频'
+            };
+            
+            Object.entries(task.result).forEach(([key, url]) => {
+                const link = document.createElement('a');
+                link.href = url;
+                link.className = 'download-btn';
+                link.textContent = fileTypes[key] || key;
+                link.target = '_blank';
+                downloadLinks.appendChild(link);
+            });
+        }
+
+        // 刷新任务列表
+        async function refreshTasks() {
+            const statusFilter = document.getElementById('status-filter').value;
+            const queryParams = statusFilter ? `?status=${statusFilter}` : '';
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/v1/tasks${queryParams}`);
+                const tasks = await response.json();
+                
+                const tasksList = document.getElementById('tasks-list');
+                tasksList.innerHTML = '';
+                
+                if (tasks.length === 0) {
+                    tasksList.innerHTML = '<p style="text-align: center; color: #666;">暂无任务</p>';
+                    return;
+                }
+                
+                tasks.forEach(task => {
+                    const taskItem = document.createElement('div');
+                    taskItem.className = 'task-item';
+                    
+                    taskItem.innerHTML = `
+                        <div class="task-header">
+                            <span class="task-id">${task.task_id}</span>
+                            <span class="status-badge status-${task.status}">${task.status}</span>
+                        </div>
+                        <div style="margin-bottom: 10px;">
+                            <strong>当前步骤:</strong> ${task.current_step}
+                        </div>
+                        <div style="margin-bottom: 10px;">
+                            <strong>进度:</strong> ${task.progress || 0}%
+                        </div>
+                        <div style="margin-bottom: 10px;">
+                            <strong>消息:</strong> ${task.message}
+                        </div>
+                        <div style="margin-bottom: 10px;">
+                            <strong>创建时间:</strong> ${new Date(task.created_at).toLocaleString()}
+                        </div>
+                        ${task.status === 'completed' && task.result ? `
+                            <div style="margin-top: 15px;">
+                                <strong>下载链接:</strong>
+                                <div style="display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap;">
+                                    ${Object.entries(task.result).map(([key, url]) => `
+                                        <a href="${url}" class="download-btn" style="flex: none; padding: 8px 15px; font-size: 14px;" target="_blank">
+                                            ${key.replace(/_/g, ' ')}
+                                        </a>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        ` : ''}
+                        ${task.status !== 'processing' ? `
+                            <button onclick="deleteTask('${task.task_id}')" 
+                                    style="background: #dc3545; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; margin-top: 10px;">
+                                删除任务
+                            </button>
+                        ` : ''}
+                    `;
+                    
+                    tasksList.appendChild(taskItem);
+                });
+            } catch (error) {
+                console.error('获取任务列表失败:', error);
+                alert('获取任务列表失败: ' + error.message);
+            }
+        }
+
+        // 删除任务
+        async function deleteTask(taskId) {
+            if (!confirm('确定要删除这个任务吗？')) return;
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/v1/tasks/${taskId}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    refreshTasks();
+                } else {
+                    const error = await response.json();
+                    alert('删除失败: ' + error.detail);
+                }
+            } catch (error) {
+                alert('删除失败: ' + error.message);
+            }
+        }
+
+        // 页面加载时刷新任务列表
+        document.addEventListener('DOMContentLoaded', () => {
+            refreshTasks();
+        });
+    </script>
+</body>
+</html>

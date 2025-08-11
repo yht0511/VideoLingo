@@ -9,7 +9,7 @@ ARG PYTHON_VERSION=3.10
 RUN sed -i 's/archive.ubuntu.com/mirrors.aliyun.com/g' /etc/apt/sources.list && \
     sed -i 's/security.ubuntu.com/mirrors.aliyun.com/g' /etc/apt/sources.list && \
     apt-get update && apt-get install -y --no-install-recommends \
-    software-properties-common git curl sudo ffmpeg fonts-noto wget \
+    software-properties-common git curl sudo nano iftop htop btop ffmpeg fonts-noto wget \
     && add-apt-repository ppa:deadsnakes/ppa \
     && apt-get update -y \
     && apt-get install -y python${PYTHON_VERSION} python${PYTHON_VERSION}-dev python${PYTHON_VERSION}-venv \
@@ -42,6 +42,14 @@ RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
 COPY requirements.txt .
 RUN pip install -e .
 
+# Install biliup
+RUN wget "https://github.com/biliup/biliup-rs/releases/download/v0.2.4/biliupR-v0.2.4-x86_64-linux-musl.tar.xz" -O biliup.tar.xz && \
+    tar -xf biliup.tar.xz && \
+    rm biliup.tar.xz && \
+    chmod +x biliupR-v0.2.4-x86_64-linux-musl/biliup && \
+    mv biliupR-v0.2.4-x86_64-linux-musl/biliup /usr/local/bin/ && \
+    rm -rf biliupR-v0.2.4-x86_64-linux-musl
+
 # Set CUDA-related environment variables
 ENV CUDA_HOME=/usr/local/cuda
 ENV PATH=${CUDA_HOME}/bin:${PATH}
@@ -51,6 +59,11 @@ ENV LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
 ARG TORCH_CUDA_ARCH_LIST="7.0 7.5 8.0 8.6+PTX"
 ENV TORCH_CUDA_ARCH_LIST=${TORCH_CUDA_ARCH_LIST}
 
-EXPOSE 8501
+# 暴露端口 - Streamlit 和 API 服务器
+EXPOSE 8501 8000
 
-CMD ["streamlit", "run", "st.py"]
+# 复制 API 服务器文件
+COPY api_server_simple.py ./api_server.py
+
+# 启动 Streamlit，API 服务器将自动在后台启动
+CMD ["streamlit", "run", "st.py", "--server.address", "0.0.0.0", "--server.port", "8501"]

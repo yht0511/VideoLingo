@@ -46,7 +46,7 @@ ffmpeg_gpu: false
 
 # *Youtube settings
 youtube:
-  cookies_path: ''
+  cookies_path: '/app/youtube.cookies.json'
 
 # *Default resolution for downloading YouTube videos [360, 1080, best]
 ytb_resolution: '1080'

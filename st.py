@@ -1,5 +1,7 @@
 import streamlit as st
 import os, sys
+import threading
+import time
 from core.st_utils.imports_and_utils import *
 from core import *
 
@@ -7,6 +9,45 @@ from core import *
 current_dir = os.path.dirname(os.path.abspath(__file__))
 os.environ['PATH'] += os.pathsep + current_dir
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+# 启动 API 服务器（在后台线程中）
+def start_api_server():
+    """启动 API 服务器"""
+    try:
+        # 延迟启动，避免与 Streamlit 冲突
+        time.sleep(5)
+        
+        # 检查是否已有 API 服务器在运行
+        import socket
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        result = sock.connect_ex(('localhost', 8000))
+        sock.close()
+        
+        if result == 0:
+            print("🔗 API 服务器已在运行")
+            return
+        
+        print("🚀 启动 VideoLingo API 服务器...")
+        import uvicorn
+        from api_server import app
+        
+        uvicorn.run(
+            app,
+            host="0.0.0.0",
+            port=8000,
+            log_level="warning",  # 减少日志输出
+            access_log=False
+        )
+    except ImportError:
+        print("⚠️ API 服务器依赖未安装，跳过启动")
+    except Exception as e:
+        print(f"⚠️ API 服务器启动失败: {e}")
+
+# 在 Streamlit 应用启动时启动 API 服务器
+if 'api_server_started' not in st.session_state:
+    st.session_state.api_server_started = True
+    api_thread = threading.Thread(target=start_api_server, daemon=True)
+    api_thread.start()
 
 st.set_page_config(page_title="VideoLingo", page_icon="docs/logo.svg")
 
@@ -112,6 +153,24 @@ def main():
     st.markdown(button_style, unsafe_allow_html=True)
     welcome_text = t("Hello, welcome to VideoLingo. If you encounter any issues, feel free to get instant answers with our Free QA Agent <a href=\"https://share.fastgpt.in/chat/share?shareId=066w11n3r9aq6879r4z0v9rh\" target=\"_blank\">here</a>! You can also try out our SaaS website at <a href=\"https://videolingo.io\" target=\"_blank\">videolingo.io</a> for free!")
     st.markdown(f"<p style='font-size: 20px; color: #808080;'>{welcome_text}</p>", unsafe_allow_html=True)
+    
+    # API 服务器信息
+    with st.expander("🔗 API 服务器信息", expanded=False):
+        st.markdown("""
+        **VideoLingo API 服务器已启动！**
+        
+        🌐 **API 文档**: [http://localhost:8000/docs](http://localhost:8000/docs)  
+        📚 **ReDoc 文档**: [http://localhost:8000/redoc](http://localhost:8000/redoc)  
+        ❤️ **健康检查**: [http://localhost:8000/health](http://localhost:8000/health)  
+        
+        **主要功能**:
+        - ✅ YouTube 视频下载和处理
+        - ✅ 视频文件上传处理
+        - ✅ 任务状态查询和管理
+        - ✅ 结果文件下载
+        - ✅ 批量处理支持
+        """)
+    
     # add settings
     with st.sidebar:
         page_setting()
