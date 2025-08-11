@@ -6,9 +6,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 ARG PYTHON_VERSION=3.10
 
 # Change software sources and install basic tools and system dependencies
-RUN sed -i 's/archive.ubuntu.com/mirrors.aliyun.com/g' /etc/apt/sources.list && \
-    sed -i 's/security.ubuntu.com/mirrors.aliyun.com/g' /etc/apt/sources.list && \
-    apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     software-properties-common git curl sudo nano iftop htop ffmpeg fonts-noto wget \
     && add-apt-repository ppa:deadsnakes/ppa \
     && apt-get update -y \
