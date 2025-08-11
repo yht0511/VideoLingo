@@ -27,7 +27,7 @@ RUN ldconfig /usr/local/cuda-$(echo $CUDA_VERSION | cut -d. -f1,2)/compat/
 
 # Set working directory and clone repository
 WORKDIR /app
-RUN git clone https://github.com/Huanshere/VideoLingo.git .
+RUN git clone https://github.com/yht0511/VideoLingo.git .
 
 # Install PyTorch and torchaudio
 RUN pip install torch==2.0.0 torchaudio==2.0.0 --index-url https://download.pytorch.org/whl/cu118
@@ -61,9 +61,6 @@ ENV TORCH_CUDA_ARCH_LIST=${TORCH_CUDA_ARCH_LIST}
 
 # 暴露端口 - Streamlit 和 API 服务器
 EXPOSE 8501 8000
-
-# 复制 API 服务器文件
-COPY api_server_simple.py ./api_server.py
 
 # 启动 Streamlit，API 服务器将自动在后台启动
 CMD ["streamlit", "run", "st.py", "--server.address", "0.0.0.0", "--server.port", "8501"]
