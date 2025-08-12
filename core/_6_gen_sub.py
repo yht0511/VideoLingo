@@ -3,6 +3,7 @@ import os
 import re
 from rich.panel import Panel
 from rich.console import Console
+from rich import print as rprint
 import autocorrect_py as autocorrect
 from core.utils import *
 from core.utils.models import *
@@ -76,6 +77,10 @@ def get_sentence_timestamps(df_words, df_sentences):
         sentence_len = len(clean_sentence)
         
         match_found = False
+        best_match_pos = -1
+        best_match_ratio = 0
+        
+        # 首先尝试精确匹配
         while current_pos <= len(full_words_str) - sentence_len:
             if full_words_str[current_pos:current_pos+sentence_len] == clean_sentence:
                 start_word_idx = position_to_word_idx[current_pos]
@@ -90,6 +95,35 @@ def get_sentence_timestamps(df_words, df_sentences):
                 match_found = True
                 break
             current_pos += 1
+        
+        # 如果精确匹配失败，尝试模糊匹配
+        if not match_found:
+            import difflib
+            current_pos_backup = current_pos
+            
+            # 重置到开始位置进行模糊匹配
+            for test_pos in range(len(full_words_str) - sentence_len + 1):
+                test_substring = full_words_str[test_pos:test_pos+sentence_len]
+                ratio = difflib.SequenceMatcher(None, clean_sentence, test_substring).ratio()
+                
+                if ratio > best_match_ratio and ratio > 0.8:  # 80% 相似度阈值
+                    best_match_ratio = ratio
+                    best_match_pos = test_pos
+            
+            if best_match_pos != -1:
+                start_word_idx = position_to_word_idx[best_match_pos]
+                end_word_idx = position_to_word_idx[min(best_match_pos + sentence_len - 1, len(full_words_str) - 1)]
+                
+                time_stamp_list.append((
+                    float(df_words['start'][start_word_idx]),
+                    float(df_words['end'][end_word_idx])
+                ))
+                
+                current_pos = best_match_pos + sentence_len
+                match_found = True
+                rprint(f"[yellow]✓ Used fuzzy match (similarity: {best_match_ratio:.2f}) for: {sentence[:50]}...[/yellow]")
+            else:
+                current_pos = current_pos_backup
             
         if not match_found:
             print(f"\n⚠️ Warning: No exact match found for sentence: {sentence}")

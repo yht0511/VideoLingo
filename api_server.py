@@ -10,6 +10,7 @@ import uuid
 import json
 import shutil
 from datetime import datetime
+import traceback
 from typing import Optional, List, Dict, Any
 from pathlib import Path
 import tempfile
@@ -133,6 +134,7 @@ app.mount("/static", StaticFiles(directory=str(WORK_DIR)), name="static")
 
 class VideoProcessor:
     """视频处理核心类"""
+    TASK_FILE_NAME = "task.json"
     
     @staticmethod
     def create_task(task_id: str, message: str = "任务已创建") -> TaskStatus:
@@ -147,11 +149,16 @@ class VideoProcessor:
             updated_at=datetime.now()
         )
         tasks[task_id] = task
+        # 持久化到磁盘
+        try:
+            VideoProcessor._save_task_to_disk(task)
+        except Exception as e:
+            print(f"持久化任务失败: {e}")
         return task
     
     @staticmethod
-    def update_task(task_id: str, status: str = None, progress: int = None, 
-                   current_step: str = None, message: str = None, result: Dict = None):
+    def update_task(task_id: str, status: Optional[str] = None, progress: Optional[int] = None, 
+                   current_step: Optional[str] = None, message: Optional[str] = None, result: Optional[Dict[str, Any]] = None):
         """更新任务状态"""
         if task_id not in tasks:
             return
@@ -169,32 +176,102 @@ class VideoProcessor:
             task.result = result
         
         task.updated_at = datetime.now()
+        # 同步保存到磁盘
+        try:
+            VideoProcessor._save_task_to_disk(task)
+        except Exception as e:
+            print(f"更新任务持久化失败: {e}")
+
+    @staticmethod
+    def _save_task_to_disk(task: 'TaskStatus') -> None:
+        """将任务信息保存到 api_workspace/{task_id}/task.json"""
+        task_dir = WORK_DIR / task.task_id
+        task_dir.mkdir(parents=True, exist_ok=True)
+        data = task.model_dump() if hasattr(task, 'model_dump') else task.dict()
+        with open(task_dir / VideoProcessor.TASK_FILE_NAME, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2, default=str)
+
+    @staticmethod
+    def _load_tasks_from_disk() -> None:
+        """从 api_workspace 读取已有任务，重建内存任务表。正在进行中的任务标记为失败。"""
+        recovered = 0
+        for item in WORK_DIR.iterdir():
+            if not item.is_dir():
+                continue
+            task_file = item / VideoProcessor.TASK_FILE_NAME
+            if not task_file.exists():
+                continue
+            try:
+                with open(task_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                task = TaskStatus(**data)
+                # 如果上次未完成，标记失败（服务已重启）
+                if task.status in {"pending", "processing"}:
+                    task.status = "failed"
+                    task.message = "服务重启导致任务中断"
+                    task.updated_at = datetime.now()
+                tasks[task.task_id] = task
+                recovered += 1
+            except Exception as e:
+                print(f"恢复任务失败 {item.name}: {e}")
+        if recovered:
+            print(f"已从磁盘恢复 {recovered} 个任务")
+
+    @staticmethod
+    def _startup_cleanup_leftovers() -> None:
+        """清理异常重启遗留的 output_backup_* / 临时 output_* 目录"""
+        try:
+            for name in os.listdir('.'):
+                # 清理 output_backup_*
+                if name.startswith('output_backup_') and os.path.isdir(name):
+                    try:
+                        shutil.rmtree(name)
+                        print(f"清理遗留目录: {name}")
+                    except Exception as e:
+                        print(f"清理遗留目录失败 {name}: {e}")
+                # 清理未使用的 output_{task}
+                if name.startswith('output_') and name != 'output' and os.path.isdir(name):
+                    try:
+                        shutil.rmtree(name)
+                        print(f"清理遗留临时目录: {name}")
+                    except Exception as e:
+                        print(f"清理遗留临时目录失败 {name}: {e}")
+        except Exception:
+            print("启动清理发生异常:\n" + traceback.format_exc())
     
     @staticmethod
-    async def process_video_pipeline(task_id: str, request: VideoProcessRequest, input_file: str = None):
+    async def process_video_pipeline(task_id: str, request: VideoProcessRequest, input_file: Optional[str] = None):
         """视频处理主流程"""
-        work_dir = WORK_DIR / task_id
-        work_dir.mkdir(exist_ok=True)
-        
-        # 切换到工作目录
+        # 保存原始目录
         original_dir = os.getcwd()
-        output_dir = work_dir / "output"
-        output_dir.mkdir(exist_ok=True)
+        
+        # 在项目根目录创建临时输出目录
+        temp_output_dir = f"output_{task_id}"
+        
+        # 保存原始的 output 目录名
+        backup_output = None
+        if os.path.exists("output"):
+            backup_output = f"output_backup_{task_id}"
+            os.rename("output", backup_output)
         
         try:
-            os.chdir(str(work_dir))
+            # 创建临时输出目录
+            os.makedirs(temp_output_dir, exist_ok=True)
+            os.rename(temp_output_dir, "output")  # 重命名为 output
             
             # 步骤1: 处理输入文件
             VideoProcessor.update_task(task_id, "processing", 5, "处理输入文件", "正在下载或处理视频文件...")
             
             if request.url:
                 # 从 URL 下载视频
-                _1_ytdlp.download_video_ytdlp(str(request.url), save_path="output", resolution=request.resolution)
+                await asyncio.get_event_loop().run_in_executor(
+                    None, _1_ytdlp.download_video_ytdlp, str(request.url), "output", request.resolution
+                )
                 video_file = _1_ytdlp.find_video_files()
             elif input_file:
                 # 复制上传的文件
                 video_filename = Path(input_file).name
-                target_path = output_dir / video_filename
+                target_path = Path("output") / video_filename
                 shutil.copy2(input_file, target_path)
                 video_file = str(target_path)
             else:
@@ -208,58 +285,81 @@ class VideoProcessor:
             
             # 步骤2: 语音识别
             VideoProcessor.update_task(task_id, "processing", 15, "语音识别", "正在使用 WhisperX 进行语音识别...")
-            _2_asr.transcribe()
+            await asyncio.get_event_loop().run_in_executor(None, _2_asr.transcribe)
             
             # 步骤3: 句子分割
             VideoProcessor.update_task(task_id, "processing", 25, "句子分割", "正在使用 NLP 和 LLM 进行句子分割...")
-            _3_1_split_nlp.split_by_spacy()
-            _3_2_split_meaning.split_sentences_by_meaning()
+            await asyncio.get_event_loop().run_in_executor(None, _3_1_split_nlp.split_by_spacy)
+            await asyncio.get_event_loop().run_in_executor(None, _3_2_split_meaning.split_sentences_by_meaning)
             
             # 步骤4: 总结和翻译
             VideoProcessor.update_task(task_id, "processing", 45, "总结和翻译", "正在进行总结和多步翻译...")
-            _4_1_summarize.get_summary()
-            _4_2_translate.translate_all()
+            await asyncio.get_event_loop().run_in_executor(None, _4_1_summarize.get_summary)
+            
+            # 关键修改：将翻译任务放在执行器中运行，避免阻塞
+            VideoProcessor.update_task(task_id, "processing", 50, "翻译处理", "正在进行文本翻译，这可能需要一些时间...")
+            try:
+                # 设置翻译超时时间（10分钟）
+                await asyncio.wait_for(
+                    asyncio.get_event_loop().run_in_executor(None, _4_2_translate.translate_all),
+                    timeout=600  # 10分钟超时
+                )
+            except asyncio.TimeoutError:
+                raise Exception("翻译过程超时，请检查网络连接和 API 配置")
+            except Exception as e:
+                raise Exception(f"翻译过程出错: {str(e)}")
             
             # 步骤5: 字幕处理和对齐
             VideoProcessor.update_task(task_id, "processing", 65, "字幕处理", "正在处理和对齐字幕...")
-            _5_split_sub.split_for_sub_main()
-            _6_gen_sub.align_timestamp_main()
+            await asyncio.get_event_loop().run_in_executor(None, _5_split_sub.split_for_sub_main)
+            await asyncio.get_event_loop().run_in_executor(None, _6_gen_sub.align_timestamp_main)
             
             # 步骤6: 合并字幕到视频
             VideoProcessor.update_task(task_id, "processing", 75, "合并字幕", "正在将字幕合并到视频...")
-            _7_sub_into_vid.merge_subtitles_to_video()
+            await asyncio.get_event_loop().run_in_executor(None, _7_sub_into_vid.merge_subtitles_to_video)
             
             result_files = {
-                "video_with_subtitles": f"/static/{task_id}/output/output_sub.mp4",
-                "source_subtitles": f"/static/{task_id}/output/src.srt",
-                "translated_subtitles": f"/static/{task_id}/output/trans.srt"
+                "video_with_subtitles": f"/static/{task_id}/output_sub.mp4",
+                "source_subtitles": f"/static/{task_id}/src.srt",
+                "translated_subtitles": f"/static/{task_id}/trans.srt"
             }
             
             # 如果启用配音
             if request.enable_dubbing:
                 # 步骤7: 生成音频任务
                 VideoProcessor.update_task(task_id, "processing", 80, "生成音频任务", "正在生成音频任务...")
-                _8_1_audio_task.gen_audio_task_main()
-                _8_2_dub_chunks.gen_dub_chunks()
+                await asyncio.get_event_loop().run_in_executor(None, _8_1_audio_task.gen_audio_task_main)
+                await asyncio.get_event_loop().run_in_executor(None, _8_2_dub_chunks.gen_dub_chunks)
                 
                 # 步骤8: 提取参考音频
                 VideoProcessor.update_task(task_id, "processing", 85, "提取参考音频", "正在提取参考音频...")
-                _9_refer_audio.extract_refer_audio_main()
+                await asyncio.get_event_loop().run_in_executor(None, _9_refer_audio.extract_refer_audio_main)
                 
                 # 步骤9: 生成音频
                 VideoProcessor.update_task(task_id, "processing", 90, "生成音频", "正在生成配音音频...")
-                _10_gen_audio.gen_audio()
+                await asyncio.get_event_loop().run_in_executor(None, _10_gen_audio.gen_audio)
                 
                 # 步骤10: 合并音频
                 VideoProcessor.update_task(task_id, "processing", 95, "合并音频", "正在合并完整音频...")
-                _11_merge_audio.merge_full_audio()
+                await asyncio.get_event_loop().run_in_executor(None, _11_merge_audio.merge_full_audio)
                 
                 # 步骤11: 合并配音到视频
                 VideoProcessor.update_task(task_id, "processing", 98, "合并配音", "正在将配音合并到视频...")
-                _12_dub_to_vid.merge_video_audio()
+                await asyncio.get_event_loop().run_in_executor(None, _12_dub_to_vid.merge_video_audio)
                 
-                result_files["video_with_dubbing"] = f"/static/{task_id}/output/output_dub.mp4"
-                result_files["dubbing_audio"] = f"/static/{task_id}/output/dub.mp3"
+                result_files["video_with_dubbing"] = f"/static/{task_id}/output_dub.mp4"
+                result_files["dubbing_audio"] = f"/static/{task_id}/dub.mp3"
+            
+            # 将结果文件移动到 API 工作空间
+            result_dir = WORK_DIR / task_id
+            result_dir.mkdir(exist_ok=True)
+            
+            if os.path.exists("output"):
+                for file in os.listdir("output"):
+                    src_path = os.path.join("output", file)
+                    if os.path.isfile(src_path):
+                        dst_path = result_dir / file
+                        shutil.copy2(src_path, dst_path)
             
             # 完成
             VideoProcessor.update_task(
@@ -273,11 +373,33 @@ class VideoProcessor:
             
         except Exception as e:
             error_msg = f"处理过程中出现错误: {str(e)}"
-            VideoProcessor.update_task(task_id, "failed", None, "错误", error_msg)
+            VideoProcessor.update_task(task_id, "failed", -1, "错误", error_msg)
             print(f"Task {task_id} failed: {error_msg}")
             
         finally:
+            # 恢复原始目录结构
+            try:
+                # 删除临时的 output 目录
+                if os.path.exists("output"):
+                    shutil.rmtree("output")
+                
+                # 恢复原始的 output 目录
+                if backup_output and os.path.exists(backup_output):
+                    os.rename(backup_output, "output")
+            except Exception as cleanup_error:
+                print(f"清理临时文件时出错: {cleanup_error}")
+            
+            # 确保在原始目录
             os.chdir(original_dir)
+
+# 在应用启动时执行：清理遗留目录并从磁盘恢复任务
+@app.on_event("startup")
+async def _on_startup():
+    try:
+        VideoProcessor._startup_cleanup_leftovers()
+        VideoProcessor._load_tasks_from_disk()
+    except Exception:
+        print("启动恢复发生异常:\n" + traceback.format_exc())
 
 # API 路由定义
 @app.get("/", summary="API 信息")
@@ -335,6 +457,10 @@ async def upload_video(
     - **enable_dubbing**: 是否启用配音
     - **burn_subtitles**: 是否烧录字幕
     """
+    # 验证文件
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="未选择文件")
+        
     # 验证文件类型
     allowed_extensions = {'.mp4', '.mov', '.avi', '.mkv', '.flv', '.wmv', '.webm'}
     file_ext = Path(file.filename).suffix.lower()
@@ -431,17 +557,31 @@ async def download_file(task_id: str, file_type: str):
         raise HTTPException(status_code=400, detail="任务尚未完成")
     
     file_mapping = {
-        "video_sub": "output/output_sub.mp4",
-        "video_dub": "output/output_dub.mp4",
-        "src_srt": "output/src.srt",
-        "trans_srt": "output/trans.srt",
-        "dub_audio": "output/dub.mp3"
+        "video_sub": "output_sub.mp4",
+        "video_dub": "output_dub.mp4", 
+        "src_srt": "src.srt",
+        "trans_srt": "trans.srt",
+        "dub_audio": "dub.mp3"
     }
     
     if file_type not in file_mapping:
         raise HTTPException(status_code=400, detail="不支持的文件类型")
     
     file_path = WORK_DIR / task_id / file_mapping[file_type]
+    
+    # 添加调试信息
+    print(f"Debug: Looking for file at: {file_path}")
+    print(f"Debug: File exists: {file_path.exists()}")
+    if not file_path.exists():
+        # 列出目录中的所有文件进行调试
+        task_dir = WORK_DIR / task_id
+        if task_dir.exists():
+            files_in_dir = list(task_dir.iterdir())
+            print(f"Debug: Files in task directory: {files_in_dir}")
+        else:
+            print(f"Debug: Task directory does not exist: {task_dir}")
+        raise HTTPException(status_code=404, detail=f"文件不存在: {file_mapping[file_type]}")
+    
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="文件不存在")
     

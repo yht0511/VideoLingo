@@ -43,11 +43,7 @@ def start_api_server():
     except Exception as e:
         print(f"⚠️ API 服务器启动失败: {e}")
 
-# 在 Streamlit 应用启动时启动 API 服务器
-if 'api_server_started' not in st.session_state:
-    st.session_state.api_server_started = True
-    api_thread = threading.Thread(target=start_api_server, daemon=True)
-    api_thread.start()
+
 
 st.set_page_config(page_title="VideoLingo", page_icon="docs/logo.svg")
 
@@ -154,7 +150,9 @@ def main():
     welcome_text = t("Hello, welcome to VideoLingo. If you encounter any issues, feel free to get instant answers with our Free QA Agent <a href=\"https://share.fastgpt.in/chat/share?shareId=066w11n3r9aq6879r4z0v9rh\" target=\"_blank\">here</a>! You can also try out our SaaS website at <a href=\"https://videolingo.io\" target=\"_blank\">videolingo.io</a> for free!")
     st.markdown(f"<p style='font-size: 20px; color: #808080;'>{welcome_text}</p>", unsafe_allow_html=True)
     
-    # API 服务器信息
+    # API 服务器
+    api_thread = threading.Thread(target=start_api_server, daemon=True)
+    api_thread.start()
     with st.expander("🔗 API 服务器信息", expanded=False):
         st.markdown("""
         **VideoLingo API 服务器已启动！**

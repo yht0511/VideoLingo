@@ -40,14 +40,6 @@ RUN rm -rf .git
 COPY requirements.txt .
 RUN pip install -e .
 
-# Install biliup
-RUN wget "https://github.com/biliup/biliup-rs/releases/download/v0.2.4/biliupR-v0.2.4-x86_64-linux-musl.tar.xz" -O biliup.tar.xz && \
-    tar -xf biliup.tar.xz && \
-    rm biliup.tar.xz && \
-    chmod +x biliupR-v0.2.4-x86_64-linux-musl/biliup && \
-    mv biliupR-v0.2.4-x86_64-linux-musl/biliup /usr/local/bin/ && \
-    rm -rf biliupR-v0.2.4-x86_64-linux-musl
-
 # Set CUDA-related environment variables
 ENV CUDA_HOME=/usr/local/cuda
 ENV PATH=${CUDA_HOME}/bin:${PATH}

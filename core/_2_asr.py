@@ -32,6 +32,11 @@ def transcribe():
     elif runtime == "elevenlabs":
         from core.asr_backend.elevenlabs_asr import transcribe_audio_elevenlabs as ts
         rprint("[cyan]🎤 Transcribing audio with ElevenLabs API...[/cyan]")
+    elif runtime == "replicate":
+        from core.asr_backend.replicate_asr import transcribe_audio_replicate as ts
+        rprint("[cyan]🎤 Transcribing audio with Replicate API...[/cyan]")
+    else:
+        raise ValueError(f"Unsupported ASR runtime: {runtime}. Supported: local, cloud, elevenlabs, replicate")
 
     for start, end in segments:
         result = ts(_RAW_AUDIO_FILE, vocal_audio, start, end)

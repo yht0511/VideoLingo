@@ -90,10 +90,46 @@ def process_transcription(result: Dict) -> pd.DataFrame:
         # Get speaker_id, if not exists, set to None
         speaker_id = segment.get('speaker_id', None)
         
-        for word in segment['words']:
-            # Check word length
+        # 处理可能缺少 words 字段的情况
+        words = segment.get('words', [])
+        if not words and 'text' in segment:
+            # 如果没有 words 但有 text，创建一个基本的 word 结构
+            words = [{
+                'word': segment['text'].strip(),
+                'start': segment.get('start', 0),
+                'end': segment.get('end', 0)
+            }]
+        
+        for word in words:
+            # 对于长文本（可能来自 Replicate），需要分割处理
             if len(word["word"]) > 30:
-                rprint(f"[yellow]⚠️ Warning: Detected word longer than 30 characters, skipping: {word['word']}[/yellow]")
+                # 如果是完整的句子或短语，按空格分割
+                word_text = word["word"].replace('»', '').replace('«', '')
+                sub_words = word_text.split()
+                
+                if len(sub_words) > 1:
+                    # 计算每个子词的时间分配
+                    word_duration = word.get("end", 0) - word.get("start", 0)
+                    duration_per_subword = word_duration / len(sub_words) if len(sub_words) > 0 else 0
+                    
+                    for i, sub_word in enumerate(sub_words):
+                        if len(sub_word) <= 30:  # 确保子词不会太长
+                            sub_start = word.get("start", 0) + i * duration_per_subword
+                            sub_end = sub_start + duration_per_subword
+                            
+                            word_dict = {
+                                "word": sub_word,
+                                "start": sub_start,
+                                "end": sub_end,
+                                "speaker_id": speaker_id
+                            }
+                            all_words.append(word_dict)
+                        else:
+                            # 如果子词仍然太长，就跳过
+                            rprint(f"[yellow]⚠️ Warning: Sub-word still too long, skipping: {sub_word}[/yellow]")
+                else:
+                    # 单个长词，直接跳过
+                    rprint(f"[yellow]⚠️ Warning: Detected word longer than 30 characters, skipping: {word['word'][:50]}...[/yellow]")
                 continue
                 
             # ! For French, we need to convert guillemets to empty strings
