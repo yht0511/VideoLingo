@@ -25,13 +25,9 @@ RUN ldconfig /usr/local/cuda-$(echo $CUDA_VERSION | cut -d. -f1,2)/compat/
 
 # Set working directory and clone repository
 WORKDIR /app
-COPY . .
 
 # Install PyTorch and torchaudio
 RUN pip install torch==2.0.0 torchaudio==2.0.0 --index-url https://download.pytorch.org/whl/cu118
-
-# Clean up unnecessary files
-RUN rm -rf .git
 
 # Upgrade pip and install basic dependencies
 # RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
@@ -39,6 +35,9 @@ RUN rm -rf .git
 # Install dependencies
 COPY requirements.txt .
 RUN pip install -e .
+
+# Copy application code
+COPY . .
 
 # Set CUDA-related environment variables
 ENV CUDA_HOME=/usr/local/cuda
