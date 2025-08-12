@@ -34,7 +34,7 @@ RUN pip install torch==2.0.0 torchaudio==2.0.0 --index-url https://download.pyto
 
 # Install dependencies
 COPY requirements.txt .
-RUN pip install -e .
+RUN pip install -r requirements.txt
 
 # Copy application code
 COPY . .
